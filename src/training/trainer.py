@@ -98,6 +98,7 @@ def train_model(model_name: str = "ae-resnet", csv_path: str = None, epochs: int
     best_val_loss = float('inf')
     patience = 5
     patience_counter = 0
+    history = []
     os.makedirs("models", exist_ok=True)
     
     for epoch in range(1, epochs + 1):
@@ -134,6 +135,15 @@ def train_model(model_name: str = "ae-resnet", csv_path: str = None, epochs: int
         epoch_val_loss = val_loss / val_total
         epoch_val_acc = val_correct / val_total
         
+        # Accumulate history log
+        history.append({
+            'epoch': epoch,
+            'train_loss': epoch_loss,
+            'train_acc': epoch_acc,
+            'val_loss': epoch_val_loss,
+            'val_acc': epoch_val_acc
+        })
+        
         print(f"Epoch {epoch}/{epochs} | Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f} | Val Loss: {epoch_val_loss:.4f} Acc: {epoch_val_acc:.4f}")
         
         # Early stopping check based on validation loss
@@ -152,4 +162,9 @@ def train_model(model_name: str = "ae-resnet", csv_path: str = None, epochs: int
             print(f"Early stopping triggered at Epoch {epoch} due to validation loss plateau.")
             break
             
+    # Save training history to CSV
+    os.makedirs("results/logs", exist_ok=True)
+    history_df = pd.DataFrame(history)
+    history_df.to_csv(f"results/logs/{model_name}_history.csv", index=False)
+    print(f"Saved training history to results/logs/{model_name}_history.csv")
     print(f"Training Complete. Best Validation Accuracy for {model_name}: {best_val_acc:.4f}")
