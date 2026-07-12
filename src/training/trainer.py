@@ -133,8 +133,8 @@ def train_model(model_name: str = "ae-resnet", csv_path: str = None, epochs: int
     os.makedirs("models", exist_ok=True)
     
     for epoch in range(1, epochs + 1):
-        # Backbone warm-up: freeze backbone parameters for the first 2 epochs (Advisor recommendation #5)
-        if epoch <= 2:
+        # Backbone warm-up: freeze backbone parameters for the first 2 epochs (only for proposed AE-ResNet)
+        if epoch <= 2 and model_name.lower() == "ae-resnet":
             for name, param in model.named_parameters():
                 if not ('csa' in name or 'fc' in name):
                     param.requires_grad = False
