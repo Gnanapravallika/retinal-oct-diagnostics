@@ -35,7 +35,7 @@ def run_training_simulation():
     torch.save(model.state_dict(), "models/ae_resnet_baseline.pth")
     print("Weights saved mock to models/ae_resnet_baseline.pth")
 
-def train_model(model_name: str = "ae-resnet", csv_path: str = None, epochs: int = 25, batch_size: int = 16):
+def train_model(model_name: str = "ae-resnet", csv_path: str = None, epochs: int = 40, batch_size: int = 16):
     """
     Main training interface supporting dynamic model selection and inverse frequency sampling.
     """
@@ -91,12 +91,28 @@ def train_model(model_name: str = "ae-resnet", csv_path: str = None, epochs: int
     model = get_model_architecture(model_name, num_classes=7, pretrained=True).to(device)
     
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=1e-5, weight_decay=1e-4)
+    
+    # Differential learning rates: lower for pre-trained backbone, higher for randomly initialized blocks (csa & fc)
+    backbone_params = []
+    new_layers_params = []
+    for name, param in model.named_parameters():
+        if 'csa' in name or 'fc' in name:
+            new_layers_params.append(param)
+        else:
+            backbone_params.append(param)
+            
+    optimizer = optim.AdamW([
+        {'params': backbone_params, 'lr': 1e-5},
+        {'params': new_layers_params, 'lr': 1e-4}
+    ], weight_decay=1e-4)
+    
+    # Cosine Annealing learning rate scheduler
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
     
     print(f"Training {model_name} for {epochs} epochs on {device}...")
     best_val_acc = 0.0
     best_val_loss = float('inf')
-    patience = 5
+    patience = 10
     patience_counter = 0
     history = []
     os.makedirs("models", exist_ok=True)
@@ -145,6 +161,9 @@ def train_model(model_name: str = "ae-resnet", csv_path: str = None, epochs: int
         })
         
         print(f"Epoch {epoch}/{epochs} | Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f} | Val Loss: {epoch_val_loss:.4f} Acc: {epoch_val_acc:.4f}")
+        
+        # Step the learning rate scheduler
+        scheduler.step()
         
         # Early stopping check based on validation loss
         if epoch_val_loss < best_val_loss:
